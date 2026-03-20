@@ -1,0 +1,94 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #020202;
+    color: #00ff00;
+    font-family: "Courier New", Courier, monospace;
+}
+
+canvas {
+    display: block;
+    transform: scale(1.05) rotateX(1.5deg) perspective(800px);
+    border-radius: 50px;
+    filter: contrast(1.2) brightness(1.2) blur(0.5px) saturate(1.5);
+}
+
+#score {
+    position: absolute;
+    top: 5vh;
+    width: 100%;
+    text-align: center;
+    font-size: 50px;
+    font-weight: bold;
+    z-index: 10;
+    text-shadow: 3px 0 1px rgba(255,0,0,0.5), -3px 0 1px rgba(0,0,255,0.5);
+    pointer-events: none;
+}
+
+/* Estilos de Barras de Estamina */
+.stamina-container {
+    position: absolute;
+    top: 25vh; /* Centradas verticalmente aproximado */
+    height: 50vh;
+    width: 15px;
+    border: 2px solid #00ff00;
+    background-color: #020202;
+    z-index: 10;
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+    pointer-events: none;
+    overflow: hidden; /* Para que la barra interna no se salga */
+}
+
+#stamina-ui-left { left: 2vw; }
+#stamina-ui-right { right: 2vw; }
+
+.stamina-bar {
+    width: 100%;
+    height: 100%; /* Controlado por JS */
+    background-color: #00ff00;
+    position: absolute;
+    bottom: 0; /* Crece desde abajo */
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.8);
+    transition: height 0.1s linear; /* Suavizado de actualización */
+}
+
+#crt-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 5;
+    pointer-events: none;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    background-size: 100% 2px, 3px 100%;
+    box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.9);
+    animation: flicker 0.15s infinite;
+}
+
+.scanline {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100px;
+    background: linear-gradient(to bottom, transparent, rgba(0, 255, 0, 0.1) 50%, transparent);
+    opacity: 0.4;
+    z-index: 6;
+    pointer-events: none;
+    animation: roll 5s linear infinite;
+}
+
+@keyframes flicker {
+    0% { opacity: 0.95; }
+    5% { opacity: 0.85; }
+    10% { opacity: 0.95; }
+    15% { opacity: 1.0; }
+    100% { opacity: 1.0; }
+}
+
+@keyframes roll {
+    0% { transform: translateY(-10vh); }
+    100% { transform: translateY(110vh); }
+}
