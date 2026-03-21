@@ -44,6 +44,15 @@ let activeCueIdx = -1;
 const holeAnims = [];
 const returnBalls = [];
 
+// estado de horror
+let firstPotted = false;
+let horrorTime = 0;
+let horrorType = '';
+
+const horrorOverlay = document.createElement('div');
+horrorOverlay.id = 'horror-overlay';
+document.body.appendChild(horrorOverlay);
+
 // fisicas
 const wallB = 0.7;
 const ballB = 0.95; 
@@ -51,7 +60,7 @@ const clock = new THREE.Clock();
 const targetFPS = 30; 
 let accTime = 0;
 
-// creador de texturas
+// creador de texturas proporcionales
 function createPixelTexture(size, color, isStripe = false, isCue = false, number = 0) {
     const canvas = document.createElement('canvas');
     canvas.width = size; canvas.height = size;
@@ -63,19 +72,20 @@ function createPixelTexture(size, color, isStripe = false, isCue = false, number
     } else {
         context.fillStyle = isStripe ? '#ffffff' : color;
         context.fillRect(0, 0, size, size);
+        
         if (isStripe) {
             context.fillStyle = color;
-            context.fillRect(0, size/4, size, size/2); 
+            context.fillRect(0, size * 0.25, size, size * 0.5); 
         }
         
         if (number > 0) {
             context.fillStyle = '#ffffff';
             context.beginPath();
-            context.arc(size/2, size/2, size/3.5, 0, Math.PI * 2);
+            context.arc(size/2, size/2, size/2.3, 0, Math.PI * 2);
             context.fill();
             
             context.fillStyle = '#000000';
-            context.font = 'bold ' + Math.floor(size/2.5) + 'px sans-serif';
+            context.font = 'bold ' + Math.floor(size/1.8) + 'px sans-serif';
             context.textAlign = 'center';
             context.textBaseline = 'middle';
             context.fillText(number.toString(), size/2, size/2 + (size*0.05));
@@ -95,11 +105,42 @@ function createPixelTexture(size, color, isStripe = false, isCue = false, number
     return tex;
 }
 
+// creador de texturas proporcionales para bolas entradas
+function createLegibleTexture(size, color, isStripe = false, number = 0) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const context = canvas.getContext('2d');
+
+    context.fillStyle = isStripe ? '#ffffff' : color;
+    context.fillRect(0, 0, size, size);
+    
+    if (isStripe) {
+        context.fillStyle = color;
+        context.fillRect(0, size * 0.25, size, size * 0.5); 
+    }
+    
+    context.fillStyle = '#ffffff';
+    context.beginPath();
+    context.arc(size/2, size/2, size/3, 0, Math.PI * 2);
+    context.fill();
+    
+    context.fillStyle = '#000000';
+    context.font = 'bold ' + Math.floor(size/2) + 'px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(number.toString(), size/2, size/2 + (size*0.04));
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.LinearFilter; 
+    tex.minFilter = THREE.LinearFilter;
+    return tex;
+}
+
 // materiales
 const feltMat = new THREE.MeshLambertMaterial({ color: 0x006622 }); 
 const woodMat = new THREE.MeshLambertMaterial({ color: 0x442200 }); 
 const cushionMat = new THREE.MeshLambertMaterial({ color: 0x004411 }); 
-const metalMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.9, roughness: 0.2 }); 
+const metalMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.3 }); 
 const holeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
 
 // dimensiones de mesa
@@ -107,13 +148,14 @@ const baseWidth = 20, baseHeight = 10;
 const tableWidth = baseWidth * 1.25, tableHeight = baseHeight * 1.25;
 const ballRadius = 0.35;
 const holeRadius = 0.7;
+const pocketHitbox = 0.9; 
 
-// construccion de la mesa
+// mesa
 const felt = new THREE.Mesh(new THREE.BoxGeometry(tableWidth, 0.5, tableHeight), feltMat);
 felt.position.y = -0.25;
 scene.add(felt);
 
-// paredes de la mesa
+// paredes
 const cushionSize = 0.6, frameSize = 1.2;
 const cushionHalfGeo = new THREE.BoxGeometry(tableWidth / 2 - 0.8, 0.8, cushionSize);
 const cushionShortGeo = new THREE.BoxGeometry(cushionSize, 0.8, tableHeight);
@@ -131,7 +173,7 @@ const cushionShortGeo = new THREE.BoxGeometry(cushionSize, 0.8, tableHeight);
     scene.add(m);
 });
 
-// marco de la mesa
+// marco
 const fLong = new THREE.BoxGeometry(tableWidth + cushionSize*2 + frameSize*2, 1.2, frameSize);
 const fShort = new THREE.BoxGeometry(frameSize, 1.2, tableHeight + cushionSize*2);
 [
@@ -156,20 +198,20 @@ holePositions.forEach(p => {
     scene.add(h);
 });
 
-// configuracion de bolas
+// bolas
 const ballColors = ['#ddcc00', '#0000dd', '#dd0000', '#440088', '#ff6600', '#00aa00', '#882200', '#111111'];
 const ballTextures = [];
 const ballTexturesLegible = [];
 for (let i = 1; i <= 15; i++) {
     ballTextures[i] = createPixelTexture(32, ballColors[(i-1)%8], i > 8, false, 0);
-    ballTexturesLegible[i] = createPixelTexture(256, ballColors[(i-1)%8], i > 8, false, i);
+    ballTexturesLegible[i] = createLegibleTexture(512, ballColors[(i-1)%8], i > 8, i);
 }
 const cueBallTex = createPixelTexture(32, '#ffffff', false, true, 0);
 const ballGeo = new THREE.IcosahedronGeometry(ballRadius, 1); 
 const balls = [];
 const triangleOrder = [1, 9, 2, 10, 8, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15]; 
 
-// creacion de bolas en escena
+// creacion bolas
 function createBall(x, z, tex, isWhite = false, index = 0) {
     const m = new THREE.Mesh(ballGeo, new THREE.MeshLambertMaterial({ map: tex }));
     m.position.set(x, ballRadius, z);
@@ -178,7 +220,7 @@ function createBall(x, z, tex, isWhite = false, index = 0) {
     balls.push({ mesh: m, pos: new THREE.Vector2(x, z), vel: new THREE.Vector2(0, 0), potted: false, isWhite, texIndex: index });
 }
 
-// reinicio de mesa
+// reinicio mesa
 function setupBalls() {
     balls.forEach(b => scene.remove(b.mesh));
     balls.length = 0;
@@ -194,7 +236,7 @@ function setupBalls() {
 }
 setupBalls();
 
-// generador de taco
+// generador taco
 function buildCueModel(buttColor) {
     const group = new THREE.Group();
     const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.2, 8), new THREE.MeshLambertMaterial({color: 0xffffff}));
@@ -207,14 +249,14 @@ function buildCueModel(buttColor) {
     return group;
 }
 
-// gestor taco activo
+// taco activo
 const cuePivot = new THREE.Group();
 let activeCueModel = buildCueModel(0x000000);
 activeCueModel.rotation.x = Math.PI / 2;
 activeCueModel.position.z = 5.5; 
 cuePivot.add(activeCueModel);
 
-// barra de carga
+// barra carga
 const powerUI = new THREE.Group();
 const barBack = new THREE.Mesh(new THREE.PlaneGeometry(3.1, 0.5), new THREE.MeshBasicMaterial({color: 0x000000}));
 const barFront = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.4), new THREE.MeshBasicMaterial({color: 0x00ff00}));
@@ -227,7 +269,7 @@ powerUI.visible = false;
 scene.add(cuePivot);
 cuePivot.visible = false;
 
-// guias visuales
+// guias predictivas
 const guideGeo = new THREE.BufferGeometry();
 const guideMat = new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.3, gapSize: 0.2, transparent: true, opacity: 0.8, depthTest: false });
 const guideLine = new THREE.Line(guideGeo, guideMat);
@@ -242,7 +284,7 @@ guideTargetLine.renderOrder = 1000;
 scene.add(guideTargetLine);
 guideTargetLine.visible = false;
 
-// rack lateral de tacos
+// rack de tacos
 const rackGroup = new THREE.Group();
 rackGroup.position.set(-18, 0, 0);
 scene.add(rackGroup);
@@ -279,26 +321,22 @@ for(let i=0; i<3; i++) {
     rackHitboxes.push(hb);
 }
 
-// rack inferior de bolas caidas
+// rack de retorno
 const returnGroup = new THREE.Group();
-returnGroup.position.set(0, -2.5, 12.5); 
+returnGroup.position.set(0, -1.5, 12.5); 
 scene.add(returnGroup);
 
-const rrBack = new THREE.Mesh(new THREE.BoxGeometry(22, 2.8, 0.2), metalMat);
-rrBack.position.set(0, 1.2, -0.5);
+const rrBack = new THREE.Mesh(new THREE.BoxGeometry(26, 0.2, 3.5), metalMat);
+rrBack.position.set(0, 0, 0);
 returnGroup.add(rrBack);
 
-const rrBot = new THREE.Mesh(new THREE.BoxGeometry(22, 0.2, 2), metalMat);
-rrBot.position.set(0, -0.1, 0);
-returnGroup.add(rrBot);
-
-const rrGlass = new THREE.Mesh(new THREE.BoxGeometry(22, 1.6, 0.1), new THREE.MeshBasicMaterial({color: 0x88ccff, transparent: true, opacity: 0.1}));
-rrGlass.position.set(0, 0.8, 0.9);
+const rrGlass = new THREE.Mesh(new THREE.BoxGeometry(26, 0.1, 2.5), new THREE.MeshBasicMaterial({color: 0x88ccff, transparent: true, opacity: 0.15}));
+rrGlass.position.set(0, 0.5, 0);
 returnGroup.add(rrGlass);
 
-// tubo de caida visible conectado al rack
-const rrTube = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 2.5), metalMat);
-rrTube.position.set(11.5, 0.4, 0);
+// tubo visible
+const rrTube = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.2, 5.5), metalMat);
+rrTube.position.set(11.5, 0, -4.25); 
 returnGroup.add(rrTube);
 
 // boton reset
@@ -311,7 +349,7 @@ if(resetBtn) {
     resetBtn.addEventListener('click', () => location.reload());
 }
 
-// listeners de raton
+// interaccion mousedown
 window.addEventListener('mousedown', (e) => {
     const moving = balls.some(b => b.vel.length() > 0.01 && !b.potted);
     if (moving) return;
@@ -361,6 +399,7 @@ window.addEventListener('mousedown', (e) => {
     }
 });
 
+// interaccion mousemove
 window.addEventListener('mousemove', (e) => {
     mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -389,7 +428,7 @@ window.addEventListener('mousemove', (e) => {
     }
 });
 
-// manejador de linea guia predictiva
+// linea predictiva
 function updateGuide(moving) {
     const whiteBall = balls.find(b => b.isWhite);
     if (moving || (cueMode !== 'AIMING' && cueMode !== 'CHARGING') || !whiteBall || whiteBall.potted) {
@@ -467,35 +506,63 @@ function updateGuide(moving) {
     guideGeo.setFromPoints(pts);
 }
 
-// disparo de animacion de caida
+// animacion mesa
 function startHoleAnim(ball, hp) {
     scene.remove(ball.mesh);
     const m = ball.mesh.clone();
     m.material = m.material.clone();
     m.material.depthTest = false; 
     m.renderOrder = 10; 
-    m.position.x = hp[0];
-    m.position.z = hp[2];
+    m.position.x = ball.pos.x;
+    m.position.z = ball.pos.y;
     scene.add(m);
-    holeAnims.push({ ball, mesh: m, t: 0, targetX: hp[0], targetZ: hp[2] });
+    holeAnims.push({ 
+        ball, mesh: m, t: 0, 
+        startX: ball.pos.x, startZ: ball.pos.y,
+        targetX: hp[0], targetZ: hp[2] 
+    });
 }
 
-// disparo animacion de riel
+// retorno empujando bolas
 function startReturnAnim(ball) {
-    const visualMat = new THREE.MeshBasicMaterial({ map: ballTexturesLegible[ball.texIndex] });
+    const visualMat = new THREE.MeshLambertMaterial({ map: ballTexturesLegible[ball.texIndex] });
     const m = new THREE.Mesh(new THREE.SphereGeometry(ballRadius * 1.5, 32, 16), visualMat);
-    m.position.set(11.5, 5, 0); 
+    m.position.set(11.5, 0.3, -7); 
+    
+    // Alineación inicial perfecta
+    m.rotation.set(-Math.PI / 2, 0, 0); 
     returnGroup.add(m);
     
-    returnBalls.forEach(b => b.targetX -= 1.2);
-    returnBalls.push({ mesh: m, targetX: 11.5, state: 'FALLING' });
+    returnBalls.forEach(b => {
+        b.targetX -= 1.6; 
+    });
+
+    returnBalls.push({ mesh: m, targetX: 11.5, state: 'DROP' });
 }
 
-// loop de fisica y render
+// motor fisico
 function animate() {
     requestAnimationFrame(animate);
     const timeDelta = clock.getDelta();
     accTime += timeDelta * timeScale;
+    
+    if (horrorTime > 0) {
+        horrorTime -= timeDelta;
+        const shake = Math.min(horrorTime, 0.5) * 2.0;
+        camera.position.x = (Math.random() - 0.5) * shake;
+        camera.position.z = (Math.random() - 0.5) * shake;
+        horrorOverlay.style.display = 'block';
+        if (horrorTime > 1.1) {
+            horrorOverlay.innerText = 'YOU ARE';
+        } else if (horrorTime < 1.0 && horrorTime > 0.05) {
+            horrorOverlay.innerText = horrorType;
+        } else {
+            horrorOverlay.style.display = 'none';
+        }
+    } else {
+        horrorOverlay.style.display = 'none';
+        camera.position.set(0, 25, 0);
+    }
     
     const physicsSteps = Math.floor(accTime * targetFPS);
     
@@ -528,7 +595,7 @@ function animate() {
                         activeCueModel.position.z -= 1.5;
                         if (activeCueModel.position.z <= 5.5) {
                             const dir = new THREE.Vector2(-Math.sin(cuePivot.rotation.y), -Math.cos(cuePivot.rotation.y)).normalize();
-                            whiteBall.vel.copy(dir.multiplyScalar(power * 0.5));
+                            whiteBall.vel.copy(dir.multiplyScalar(power * 0.8));
                             cueMode = 'AIMING'; power = 0; activeCueModel.position.z = 5.5; 
                         }
                     }
@@ -544,8 +611,9 @@ function animate() {
                 const anim = holeAnims[i];
                 anim.t += delta * 4; 
                 
+                anim.mesh.position.x = THREE.MathUtils.lerp(anim.startX, anim.targetX, anim.t);
+                anim.mesh.position.z = THREE.MathUtils.lerp(anim.startZ, anim.targetZ, anim.t);
                 anim.mesh.position.y = ballRadius - (anim.t * 2.0); 
-                anim.mesh.scale.setScalar(Math.max(0.01, 1 - anim.t));
                 
                 if (anim.t >= 1) {
                     scene.remove(anim.mesh);
@@ -558,61 +626,63 @@ function animate() {
                         cueMode = 'NONE';
                     } else {
                         startReturnAnim(anim.ball);
+                        if (!firstPotted) {
+                            firstPotted = true;
+                            horrorTime = 2.0;
+                            horrorType = anim.ball.texIndex > 8 ? 'STRIPED' : 'SOLID';
+                        }
                     }
                 }
             }
 
-            // caida en rack de retorno
+            // rack retorno
             returnBalls.forEach(b => {
-                if (b.state === 'FALLING') {
-                    b.mesh.position.y -= 0.3; 
-                    if (b.mesh.position.y <= 0.6) {
-                        b.mesh.position.y = 0.6;
+                if (b.state === 'DROP') {
+                    b.mesh.position.z += 0.4; 
+                    if (b.mesh.position.z >= 0) {
+                        b.mesh.position.z = 0;
                         b.state = 'ROLLING';
                     }
+                    // Mantener alineación
+                    b.mesh.rotation.set(-Math.PI / 2, 0, 0);
                 } else if (b.state === 'ROLLING') {
                     if (b.mesh.position.x > b.targetX) {
-                        b.mesh.position.x -= 0.15;
-                        b.mesh.rotation.z += 0.2; 
+                        b.mesh.position.x -= 0.25;
                         if (b.mesh.position.x <= b.targetX) {
                             b.mesh.position.x = b.targetX;
                             b.state = 'ALIGNING';
                         }
-                    } else if (b.mesh.position.x < b.targetX) {
-                        b.mesh.position.x = THREE.MathUtils.lerp(b.mesh.position.x, b.targetX, 0.2);
-                        b.mesh.rotation.z += 0.1;
                     } else {
                         b.state = 'ALIGNING';
                     }
+                    // Mantener alineación mientras rueda
+                    b.mesh.rotation.set(-Math.PI / 2, 0, 0);
                 }
                 
-                if (b.state === 'ALIGNING' || (b.state === 'ROLLING' && Math.abs(b.mesh.position.x - b.targetX) < 0.05)) {
-                    b.mesh.rotation.x = THREE.MathUtils.lerp(b.mesh.rotation.x, -Math.PI / 2, 0.15);
-                    b.mesh.rotation.y = THREE.MathUtils.lerp(b.mesh.rotation.y, 0, 0.15); 
-                    b.mesh.rotation.z = THREE.MathUtils.lerp(b.mesh.rotation.z, 0, 0.15);
+                // ROTACIÓN EN POSICIÓN (LEGUIBILIDAD)
+                if (b.state === 'ALIGNING') {
+                    b.mesh.rotation.y += 0.05;
                 }
-                
+
                 if (b.state === 'ALIGNING' && b.mesh.position.x > b.targetX) {
                     b.state = 'ROLLING';
                 }
             });
 
-            // motor de colisiones
+            // colisiones fisicas
             const subSteps = 20; 
             for (let s = 0; s < subSteps; s++) {
                 
-                // mover bolas
                 balls.forEach(b => {
                     if (b.potted) return;
                     b.pos.x += b.vel.x / subSteps;
                     b.pos.y += b.vel.y / subSteps;
                 });
 
-                // detectar agujeros
                 balls.forEach(b => {
                     if (b.potted) return;
                     for (let hp of holePositions) {
-                        if (Math.sqrt((b.pos.x - hp[0])**2 + (b.pos.y - hp[2])**2) < holeRadius) {
+                        if (Math.sqrt((b.pos.x - hp[0])**2 + (b.pos.y - hp[2])**2) < pocketHitbox) {
                             b.potted = true; 
                             b.vel.set(0,0);
                             startHoleAnim(b, hp);
@@ -621,7 +691,6 @@ function animate() {
                     }
                 });
 
-                // detectar bandas
                 balls.forEach(b => {
                     if (b.potted) return;
                     if (b.pos.x < -tableWidth/2 + ballRadius) { b.vel.x = Math.abs(b.vel.x)*wallB; b.pos.x = -tableWidth/2 + ballRadius; }
@@ -630,7 +699,6 @@ function animate() {
                     if (b.pos.y > tableHeight/2 - ballRadius) { b.vel.y = -Math.abs(b.vel.y)*wallB; b.pos.y = tableHeight/2 - ballRadius; }
                 });
 
-                // detectar colision entre bolas
                 for (let i = 0; i < balls.length; i++) {
                     if (balls[i].potted) continue;
                     for (let j = i + 1; j < balls.length; j++) {
@@ -664,7 +732,7 @@ function animate() {
                 }
             }
 
-            // friccion de movimiento
+            // friccion
             balls.forEach(b => {
                 if(b.vel.length() > 0.0001 && !b.potted) {
                     const speed = b.vel.length();

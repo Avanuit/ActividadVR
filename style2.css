@@ -3,25 +3,20 @@ body {
     overflow: hidden;
     background-color: #050510;
     color: #00ff00;
-    font-family: 'Press Start 2P', cursive; /* Fuente pixel art por defecto */
+    font-family: 'Press Start 2P', cursive;
 }
 
 canvas {
     display: block;
     width: 100vw;
     height: 100vh;
-    /* Efecto CRT/Ojo de Pez */
     transform: scale(1.03) rotateX(0.8deg) perspective(1000px);
     border-radius: 40px;
-    
-    /* MAGIA: Pixelación instantánea al escalar */
     image-rendering: pixelated; 
-    
-    /* Filtros retro */
     filter: contrast(1.1) brightness(1.2) blur(0.3px) saturate(1.3);
 }
 
-/* Efectos de pantalla CRT Retro */
+
 #crt-overlay {
     position: absolute;
     top: 0; left: 0; width: 100vw; height: 100vh;
@@ -40,12 +35,12 @@ canvas {
     animation: roll 6s linear infinite;
 }
 
-/* Estilo del Botón de Reset Retro Pixel Art Neón */
+
 #retro-reset-button {
     position: absolute;
-    bottom: 3vh; /* Mover a la parte inferior debajo de la mesa */
+    bottom: 3vh;
     left: 50%;
-    transform: translateX(-50%); /* Centrar horizontalmente */
+    transform: translateX(-50%);
     z-index: 10;
     background-color: #020202;
     border: 3px solid #00ff00;
@@ -58,7 +53,7 @@ canvas {
     text-shadow: 0 0 10px rgba(0, 255, 0, 0.9);
     transition: all 0.1s ease-out;
     border-radius: 5px;
-    pointer-events: auto; /* Permitir interacción */
+    pointer-events: auto;
 }
 
 #retro-reset-button:hover {
@@ -73,10 +68,33 @@ canvas {
     text-shadow: none;
 }
 
-/* Fuente pixel art para el texto del botón */
+
+#horror-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #880000;
+    font-family: 'Nosifer', cursive; 
+    font-size: 80px;
+    text-shadow: 0 0 20px #ff0000, 5px 5px 5px #000000;
+    pointer-events: none;
+    z-index: 1000;
+    text-align: center;
+    display: none;
+    animation: blood-pulse 0.2s infinite;
+}
+
 .pixel-font {
     font-family: 'Press Start 2P', cursive;
 }
 
+
 @keyframes flicker { 0% { opacity: 0.95; } 50% { opacity: 1.0; } 100% { opacity: 0.97; } }
 @keyframes roll { 0% { transform: translateY(-10vh); } 100% { transform: translateY(110vh); } }
+
+@keyframes blood-pulse {
+    0% { transform: translate(-50%, -50%) scale(1); filter: brightness(1) blur(0px); }
+    50% { transform: translate(-50.5%, -49.5%) scale(1.05); filter: brightness(1.8) blur(1px); }
+    100% { transform: translate(-49.5%, -50.5%) scale(1); filter: brightness(1) blur(0px); }
+}
